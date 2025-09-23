@@ -2,11 +2,16 @@ package cmd
 
 import (
 	"archive/zip"
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
+	"os/user"
 	"path/filepath"
+	"runtime"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -65,7 +70,7 @@ func saveVscode(tempDir string) error {
 func createBackup() error {
 
 	tempDir, err := os.MkdirTemp("", "test_orbit-backup")
-	fmt.Println("[info] --- 成功创建临时目录：%v", tempDir)
+	fmt.Printf("[info] --- 成功创建临时目录：%v\n", tempDir)
 	if err != nil {
 		return err
 	}
@@ -74,6 +79,34 @@ func createBackup() error {
 	if err := saveVscode(tempDir); err != nil {
 		return err
 	}
+
+	formatTimeStr := "2021-01-01 11:18:00"
+	curUser, err := user.Current()
+	if err != nil {
+		return err
+	}
+
+	// 创建manifest.json文件
+	var manifestContent Manifest = Manifest{
+		Timestamp: time.Now().Format(formatTimeStr),
+		OS:        runtime.GOOS,
+		Arch:      runtime.GOARCH,
+		Hostname:  os.Getenv("COMPUTERNAME"),
+		Username:  curUser.Username,
+	}
+
+	buf := &bytes.Buffer{}
+	err = binary.Read(buf, binary.LittleEndian, manifestContent)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("manifestContent:", manifestContent)
+
+	manifestPath := filepath.Join(tempDir, "manifest.json")
+	if err := os.WriteFile(manifestPath, buf.Bytes(), 0644); err != nil {
+		return err
+	}
+	fmt.Printf("[info] --- 创建manifest.json文件\n")
 
 	backupFile, err := os.Create("backup.orbit")
 	if err != nil {
