@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"archive/zip"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -9,6 +10,35 @@ import (
 
 	"github.com/spf13/cobra"
 )
+
+func readManifest(file *zip.File) error {
+	rc, err := file.Open()
+	if err != nil {
+		return fmt.Errorf("无法打开 manifest.json: %v", err)
+	}
+	defer rc.Close()
+
+	// 解析 JSON 内容
+	content, err := io.ReadAll(rc)
+	if err != nil {
+		return fmt.Errorf("无法读取 manifest.json 内容: %v", err)
+	}
+
+	var manifest Manifest
+	err = json.Unmarshal(content, &manifest)
+	if err != nil {
+		return fmt.Errorf("无法解析 manifest.json 内容: %v", err)
+	}
+
+	fmt.Printf("Manifest 内容: \n")
+	fmt.Printf("  保存的时间: %s\n", manifest.Timestamp)
+	fmt.Printf("  系统:        %s\n", manifest.OS)
+	fmt.Printf("  架构:      %s\n", manifest.Arch)
+	fmt.Printf("  主机名:  %s\n", manifest.Hostname)
+	fmt.Printf("  用户名:  %s\n", manifest.Username)
+
+	return nil
+}
 
 func readFromOrbitFile(filePath string) error {
 	fmt.Printf("正在读取 .orbit 文件: %s\n", filePath)
@@ -75,7 +105,6 @@ func readFromOrbitFile(filePath string) error {
 	// 如果存在manifest.json，读取并显示其内容
 	if hasManifest {
 		fmt.Println("----------------------------------------")
-		fmt.Println("manifest.json 内容:")
 
 		for _, file := range r.File {
 			if file.Name == "manifest.json" {
@@ -86,13 +115,13 @@ func readFromOrbitFile(filePath string) error {
 				}
 				defer rc.Close()
 
-				content, err := io.ReadAll(rc)
-				if err != nil {
-					fmt.Printf("  错误: 无法读取 manifest.json 内容: %v\n", err)
-					break
-				}
+				// content, err := io.ReadAll(rc)
+				// if err != nil {
+				// 	fmt.Printf("  错误: 无法读取 manifest.json 内容: %v\n", err)
+				// 	break
+				// }
 
-				fmt.Printf("  %s\n", string(content))
+				readManifest(file)
 				break
 			}
 		}

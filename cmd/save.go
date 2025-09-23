@@ -2,8 +2,7 @@ package cmd
 
 import (
 	"archive/zip"
-	"bytes"
-	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
@@ -67,6 +66,34 @@ func saveVscode(tempDir string) error {
 	return err
 }
 
+func getWinUserName() (string, error) {
+
+	user, err := user.Current()
+	if err != nil {
+		return "unknown", err
+	}
+
+	return user.Name, nil
+}
+
+func getWinUserName2() (string, error) {
+	var username string
+
+	_, err := os.UserHomeDir()
+	if err != nil {
+		username = "unknown" // 如果获取失败，使用默认值
+	} else {
+		// 这是一个简单的方法，实际上可能需要更复杂的逻辑来提取用户名
+		// 例如在Unix系统上，可以从环境变量 $USER 获取
+		username = os.Getenv("USER")
+		if username == "" {
+			username = "unknown"
+		}
+	}
+
+	return username, err
+}
+
 func createBackup() error {
 
 	tempDir, err := os.MkdirTemp("", "test_orbit-backup")
@@ -80,30 +107,31 @@ func createBackup() error {
 		return err
 	}
 
-	formatTimeStr := "2021-01-01 11:18:00"
-	curUser, err := user.Current()
+	// 获取系统信息
+	hostname, err := os.Hostname()
 	if err != nil {
+		fmt.Printf("获取主机名失败: %v\n", err)
 		return err
 	}
 
+	// 获取当前用户名
+	// 注意：os.UserHomeDir() 不能直接获取用户名，这里使用另一种方式
+	username, err := getWinUserName()
+
 	// 创建manifest.json文件
 	var manifestContent Manifest = Manifest{
-		Timestamp: time.Now().Format(formatTimeStr),
+		Timestamp: time.Now().Format(time.RFC3339),
 		OS:        runtime.GOOS,
 		Arch:      runtime.GOARCH,
-		Hostname:  os.Getenv("COMPUTERNAME"),
-		Username:  curUser.Username,
+		Hostname:  hostname,
+		Username:  username,
 	}
-
-	buf := &bytes.Buffer{}
-	err = binary.Read(buf, binary.LittleEndian, manifestContent)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println("manifestContent:", manifestContent)
 
 	manifestPath := filepath.Join(tempDir, "manifest.json")
-	if err := os.WriteFile(manifestPath, buf.Bytes(), 0644); err != nil {
+
+	jsonData, err := json.MarshalIndent(manifestContent, "", "  ")
+
+	if err := os.WriteFile(manifestPath, jsonData, 0644); err != nil {
 		return err
 	}
 	fmt.Printf("[info] --- 创建manifest.json文件\n")
