@@ -8,6 +8,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// VSCode的配置目录
+var CodeConfigDir string = filepath.Join(os.Getenv("APPDATA"), "Code")
+
+// 当前目录的绝对路径
+var CurrentDir, _ = filepath.Abs(".")
+
 type Manifest struct {
 	Timestamp string `json:"timestamp"`
 	OS        string `json:"os"`
@@ -15,9 +21,6 @@ type Manifest struct {
 	Hostname  string `json:"hostname"`
 	Username  string `json:"username"`
 }
-
-// VSCode的配置目录
-var CodeConfigDir string = filepath.Join(os.Getenv("APPDATA"), "Code")
 
 var rootCmd = &cobra.Command{
 	Use:   "orbit",

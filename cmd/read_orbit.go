@@ -74,17 +74,17 @@ func readFromOrbitFile(filePath string) error {
 	configCount := 0
 
 	fmt.Println("文件列表:")
-	for i, file := range r.File {
-		fmt.Printf("  %d. %s", i+1, file.Name)
+	for _, file := range r.File {
+		// fmt.Printf("  %d. %s", i+1, file.Name)
 
 		if file.FileInfo().IsDir() {
-			fmt.Printf(" (目录)")
+			// fmt.Printf(" (目录)")
 		} else {
 			fileSize := int64(file.UncompressedSize64)
 			totalSize += fileSize
-			fmt.Printf(" (%d 字节)", fileSize)
+			// fmt.Printf(" (%d 字节)", fileSize)
 		}
-		fmt.Println()
+		// fmt.Println()
 
 		// 检查特殊文件
 		if file.Name == "manifest.json" {
@@ -131,7 +131,7 @@ func readFromOrbitFile(filePath string) error {
 }
 
 var readOrbitFile = &cobra.Command{
-	Use:   "read-orbit [name.orbit]",
+	Use:   "read [name.orbit]",
 	Short: "Read configuration from an .orbit file",
 	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {

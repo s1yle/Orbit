@@ -198,6 +198,7 @@ var save = &cobra.Command{
 	- manifest.json with timestamp and system information
 	- software-list.json with installed software
 	- configs/ folder with configuration files`,
+	Args: cobra.MaximumNArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := createBackup(); err != nil {
 			fmt.Printf("[error] ---  %v", err)
