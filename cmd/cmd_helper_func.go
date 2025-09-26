@@ -3,9 +3,60 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/user"
+	"path/filepath"
 )
+
+func findFileWithWalk(rootDir, targetFileName string) (*os.File, error) {
+	var foundFile *os.File
+
+	fmt.Printf("在当前路径(%v)查找文件：%v \n", rootDir, targetFileName)
+
+	err := filepath.WalkDir(rootDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if d.IsDir() {
+			return nil //跳过目录
+		}
+
+		// fmt.Println("rootDir, ", rootDir, " --- ", d.Name())
+
+		fileName := filepath.Base(path)
+		if fileName == targetFileName { //检查是否是目标文件
+			foundFile_stat, err := os.Stat(path)
+			if err != nil {
+				fmt.Printf("无法获取文件(%v)信息: %v \n", foundFile_stat.Name(), err)
+				return err
+			}
+
+			f, err := os.OpenFile(path, 0644, os.ModePerm)
+			if err != nil {
+				fmt.Printf("无法打开文件(%v): %v \n", foundFile_stat.Name(), err)
+				return err
+			}
+			defer f.Close()
+
+			fmt.Println("找到文件: ",
+				foundFile_stat.Name(), " 大小: ",
+				foundFile_stat.Size(), " 字节",
+				foundFile_stat.Mode().Type(), " 类型")
+
+			foundFile = f
+		}
+
+		return err
+	})
+
+	if err != nil {
+		return foundFile, err
+	}
+
+	return foundFile, err
+}
 
 func copyFile(dst, src string) error {
 	srcFile, err := os.Open(src)

@@ -20,6 +20,20 @@ func loadFunc() error {
 	}
 	fmt.Println("当前目录: ", CurrentDir)
 
+	orbitFile, err := findFileWithWalk(CurrentDir, "backup.orbit")
+	if err != nil {
+		return err
+	}
+	defer orbitFile.Close()
+
+	if orbitFile != nil {
+		fmt.Println("[info] --- 发现 .orbit 文件, 准备加载: ", orbitFile.Name())
+		readFromOrbitFile(orbitFile.Name())
+
+		// var codeConfigPath string = "C:\\Users\\mmili985\\Desktop\\_CodeWorkSpace\\GoLang\\Proj\\Code_test"
+
+	}
+
 	return nil
 }
 
