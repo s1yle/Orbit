@@ -7,7 +7,14 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"runtime"
 )
+
+// 辅助函数：获取当前目录
+func getCurrentDir() string {
+	_, filename, _, _ := runtime.Caller(1)
+	return filepath.Dir(filename)
+}
 
 func findFileWithWalk(rootDir, targetFileName string) (*os.File, error) {
 	var foundFile *os.File

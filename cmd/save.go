@@ -17,23 +17,40 @@ import (
 func saveVscode(tempDir string) error {
 	fmt.Println("[info] --- 正在保存Vscode配置文件...")
 
+	configs_base := filepath.Join(tempDir, "configs")
+	configs_base_vscode_base := filepath.Join(tempDir, "configs", "vscode_config_dir")
+	configs_base_vscode_base_APPDATA := filepath.Join(tempDir, "configs", "vscode_config_dir", "APPDATA")
+
 	UsersFile := filepath.Join(CodeConfigDir, "User")
 	WorkspacesFile := filepath.Join(CodeConfigDir, "Workspaces")
 	dirs := []string{UsersFile, WorkspacesFile}
 	// fmt.Println("dirs: ", dirs)
-	err := os.MkdirAll(filepath.Join(tempDir, "configs"), 0644)
+	err := os.MkdirAll(filepath.Join(configs_base), 0644)
+	if err != nil {
+		return err
+	}
+	err = os.MkdirAll(configs_base_vscode_base, 0644)
 	if err != nil {
 		return err
 	}
 
 	for _, dir := range dirs {
+		workingDir := filepath.Base(dir)
+		err = os.MkdirAll(filepath.Join(configs_base_vscode_base_APPDATA, workingDir), 0644)
+		if err != nil {
+			return err
+		}
+
 		filepath.Walk(dir, func(path string, info fs.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
-
-			relPath, _ := filepath.Rel(dir, path)                                // 获取相对路径
-			dstPath := filepath.Join(filepath.Join(tempDir, "configs"), relPath) // 目标路径
+			// fmt.Printf("[info] --- 当前目录: %v \n", filepath.Base(dir))
+			relPath, err := filepath.Rel(dir, path) // 获取相对路径
+			if err != nil {
+				return err
+			}
+			dstPath := filepath.Join(filepath.Join(configs_base_vscode_base_APPDATA, workingDir), relPath) // 目标路径
 
 			if info.IsDir() {
 				err = os.MkdirAll(dstPath, os.ModePerm) // 创建目录
@@ -110,12 +127,18 @@ func createOrbitZip(tempDir string) error {
 		// fmt.Println(path)
 
 		relpath, err := filepath.Rel(tempDir, path)
+
+		if relpath == "." {
+			return nil
+		}
+
 		if err != nil {
 			return err
 		}
 
 		// 如果是目录，创建目录条目并返回
 		if info.IsDir() {
+			// fmt.Println(relpath)
 			// 为目录创建条目（以斜杠结尾）
 			_, err := zipWriter.Create(relpath + "/")
 			if err != nil {
