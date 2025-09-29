@@ -1,0 +1,8 @@
+[2025-09-29 15:00:47] [info] 成功创建临时目录：C:\Users\mmili985\AppData\Local\Temp\test_orbit-backup761579747
+[2025-09-29 15:00:47] [info] 正在保存Vscode配置文件...
+[2025-09-29 15:00:47] [info] 创建manifest.json文件
+[2025-09-29 15:00:47] [info] ---  正在将文件写入 orbit包
+[2025-09-29 15:00:47] [info] 正在保存 -> 文件编辑历史(History)
+[2025-09-29 15:00:48] [info] 正在保存 -> 扩展的全局配置数据(globalStorage)
+[2025-09-29 15:00:48] [info] 正在保存 -> 用户自定义代码片段(snippets)
+[2025-09-29 15:00:48] [info] 正在保存 -> 工作区特定配置(workspaceStorage)

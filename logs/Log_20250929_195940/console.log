@@ -1,0 +1,7 @@
+[2025-09-29 19:59:41] [info] 成功创建临时目录：C:\Users\mmili985\AppData\Local\Temp\test_orbit-backup253680765
+[2025-09-29 19:59:41] [info] 正在保存Vscode配置文件...
+[2025-09-29 19:59:41] [info] CodeConfigDir: C:\Users\mmili985\AppData\Roaming\Code
+[2025-09-29 19:59:41] [info] 正在保存 -> User (APPDATA)
+[2025-09-29 19:59:42] [info] 正在保存 -> Workspaces (APPDATA)
+[2025-09-29 20:00:10] [info] 创建manifest.json文件
+[2025-09-29 20:00:10] [info] ---  正在将文件写入 orbit包
