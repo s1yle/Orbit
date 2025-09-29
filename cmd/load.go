@@ -2,11 +2,9 @@ package cmd
 
 import (
 	"archive/zip"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/spf13/cobra"
 )
@@ -33,7 +31,8 @@ func findOrbitFile(startDir string) (string, error) {
 	parentDir := filepath.Dir(startDir)
 	if parentDir == startDir {
 		// 已经到达根目录
-		return "", fmt.Errorf("未找到.orbit文件")
+		logger.Errorf("未找到.orbit文件")
+		return "", err
 	}
 
 	return findOrbitFile(parentDir)
@@ -41,7 +40,7 @@ func findOrbitFile(startDir string) (string, error) {
 
 // extractFile 解压单个文件
 func extractFile(zipFile *zip.File, targetPath string) error {
-	// fmt.Printf("[info] --- 解压单个文件中 -- 文件名: %v, 解压目录: %v \n", zipFile.Name, targetPath)
+	// logger.Infof("解压单个文件中 -- 文件名: %v, 解压目录: %v ", zipFile.Name, targetPath)
 	// 如果是目录，创建目录
 	if zipFile.FileInfo().IsDir() {
 		return os.MkdirAll(targetPath, zipFile.Mode())
@@ -76,22 +75,25 @@ func extractOrbitFile(orbitFilePath, targetPath string) error {
 	// 打开zip文件
 	reader, err := zip.OpenReader(orbitFilePath)
 	if err != nil {
-		return fmt.Errorf("无法打开.orbit文件: %v", err)
+		logger.Errorf("无法打开.orbit文件: %v", err)
+		return err
 	}
 	defer reader.Close()
 
 	// 创建目标目录
 	if err := os.MkdirAll(targetPath, 0755); err != nil {
-		return fmt.Errorf("创建目标目录失败: %v", err)
+		logger.Errorf("创建目标目录失败: %v", err)
+		return err
 	}
 
 	// 遍历zip文件中的每个文件/目录
 	for _, file := range reader.File {
-		// fmt.Printf("[info] --- 文件: %v \n", file.Name)
+		// logger.Infof("文件: %v ", file.Name)
 		filePath := filepath.Join(targetPath, file.Name)
 
 		if err := extractFile(file, filePath); err != nil {
-			return fmt.Errorf("解压文件 %s 失败: %v", file.Name, err)
+			logger.Errorf("解压文件 %s 失败: %v", file.Name, err)
+			return err
 		}
 	}
 
@@ -104,7 +106,8 @@ func readConfigFile(configPath string) (*Config, error) {
 
 	// 检查configs目录是否存在
 	if _, err := os.Stat(configDir); os.IsNotExist(err) {
-		return nil, fmt.Errorf("configs目录不存在: %s", configDir)
+		logger.Errorf("configs目录不存在: %s", configDir)
+		return nil, err
 	}
 
 	// 这里可以添加具体的配置文件读取逻辑
@@ -115,49 +118,45 @@ func readConfigFile(configPath string) (*Config, error) {
 		TargetPath:       configPath,
 	}
 
-	fmt.Printf("[info] --- 配置文件目录: %s\n", configDir)
+	logger.Infof("配置文件目录: %s", configDir)
 
 	// 可以添加更多配置读取逻辑
 	// 例如：读取具体的配置文件内容
 
 	return config, nil
 }
+
 func loadFunc() error {
 	targetExtractPath := "F:/_Default/GoLang/Proj/backup_orbit_test"
 
-	fmt.Println("[info] --- 正在搜索 .orbit 文件...")
-
-	// 获取当前执行文件所在目录
-	_, filename, _, ok := runtime.Caller(0)
-	if !ok {
-		return fmt.Errorf("无法获取当前目录")
-	}
-	currentDir := filepath.Dir(filename)
-	fmt.Printf("当前目录: %s\n", currentDir)
+	logger.Infof("正在搜索 .orbit 文件...")
 
 	// 搜索.orbit文件
-	orbitFilePath, err := findOrbitFile(currentDir)
+	orbitFilePath, err := findOrbitFile(getCurrentDir())
 	if err != nil {
-		return fmt.Errorf("查找.orbit文件失败: %v", err)
+		logger.Errorf("查找.orbit文件失败: %v", err)
+		return err
 	}
 
-	fmt.Printf("[info] --- 发现 .orbit 文件: %s\n", orbitFilePath)
+	logger.Infof("发现 .orbit 文件: %s", orbitFilePath)
 
 	// 解压.orbit文件
 	if err := extractOrbitFile(orbitFilePath, targetExtractPath); err != nil {
-		return fmt.Errorf("解压.orbit文件失败: %v", err)
+		logger.Errorf("解压.orbit文件失败: %v", err)
+		return err
 	}
 
-	fmt.Printf("[info] --- .orbit 文件已成功解压到: %s\n", targetExtractPath)
+	logger.Infof(".orbit 文件已成功解压到: %s", targetExtractPath)
 
 	// 读取配置文件
-	config, err := readConfigFile(targetExtractPath)
+	_, err = readConfigFile(targetExtractPath)
 	if err != nil {
-		return fmt.Errorf("读取配置文件失败: %v", err)
+		logger.Errorf("读取配置文件失败: %v", err)
+		return err
 	}
-	fmt.Println("[info] --- config: ", config)
+	// logger.Infof("config: ", config)
 
-	fmt.Println("[info] --- 配置加载完成")
+	logger.Infof("配置加载完成")
 	return nil
 }
 
@@ -166,14 +165,14 @@ var load = &cobra.Command{
 	Short: "Load configuration from an .orbit file",
 	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("[info] --- 开始启动 load 程序..., 参数为: ", args)
+		logger.Infof("开始启动 load 程序..., 参数为: ", args)
 
 		if err := loadFunc(); err != nil {
-			fmt.Printf("[error] ---  %v", err)
-			os.Exit(1)
+			logger.Errorf("load程序执行失败, %v", err)
+			return
 		}
 
-		fmt.Println("[info] --- load 程序执行完毕.")
+		logger.Infof("load 程序执行完毕.")
 	},
 }
 

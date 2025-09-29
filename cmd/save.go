@@ -3,7 +3,6 @@ package cmd
 import (
 	"archive/zip"
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -15,7 +14,7 @@ import (
 )
 
 func saveVscode(tempDir string) error {
-	fmt.Println("[info] --- 正在保存Vscode配置文件...")
+	logger.Infof("正在保存Vscode配置文件...")
 
 	configs_base := filepath.Join(tempDir, "configs")
 	configs_base_vscode_base := filepath.Join(tempDir, "configs", "vscode_config_dir")
@@ -78,7 +77,7 @@ func convertMeniToJson() ([]byte, error) {
 
 	hostname, err := os.Hostname()
 	if err != nil {
-		fmt.Printf("获取主机名失败: %v\n", err)
+		logger.Infof("获取主机名失败: %v", err)
 		return jsonData, err
 	}
 
@@ -118,7 +117,7 @@ func createOrbitZip(tempDir string) error {
 	zipWriter := zip.NewWriter(backupFile)
 	defer zipWriter.Close()
 
-	fmt.Println("---  正在将文件写入 orbit包")
+	logger.Info("---  正在将文件写入 orbit包")
 	err = filepath.Walk(tempDir, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -149,13 +148,13 @@ func createOrbitZip(tempDir string) error {
 
 			switch dirname {
 			case "globalStorage":
-				fmt.Printf("[info] ---- 正在保存 -> 扩展的全局配置数据(%v/)\n", dirname)
+				logger.Infof("正在保存 -> 扩展的全局配置数据(%v)", dirname)
 			case "History":
-				fmt.Printf("[info] ---- 正在保存 -> 文件编辑历史(%v/)\n", dirname)
+				logger.Infof("正在保存 -> 文件编辑历史(%v)", dirname)
 			case "snippets":
-				fmt.Printf("[info] ---- 正在保存 -> 用户自定义代码片段(%v/)\n", dirname)
+				logger.Infof("正在保存 -> 用户自定义代码片段(%v)", dirname)
 			case "workspaceStorage":
-				fmt.Printf("[info] ---- 正在保存 -> 工作区特定配置(%v/)\n", dirname)
+				logger.Infof("正在保存 -> 工作区特定配置(%v)", dirname)
 			}
 			return nil
 		}
@@ -183,7 +182,7 @@ func createBackup() error {
 
 	// @param tempDir C:\Users\mmili\AppData\Local\Temp\test_orbit-backup
 	tempDir, err := os.MkdirTemp("", "test_orbit-backup")
-	fmt.Printf("[info] --- 成功创建临时目录：%v\n", tempDir)
+	logger.Infof("成功创建临时目录：%v", tempDir)
 	if err != nil {
 		return err
 	}
@@ -203,7 +202,7 @@ func createBackup() error {
 	if err := os.WriteFile(manifestPath, jsonData, 0644); err != nil {
 		return err
 	}
-	fmt.Printf("[info] --- 创建manifest.json文件\n")
+	logger.Info("创建manifest.json文件")
 
 	//压缩成.orbit格式
 	err = createOrbitZip(tempDir)
@@ -224,7 +223,7 @@ var save = &cobra.Command{
 	Args: cobra.MaximumNArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := createBackup(); err != nil {
-			fmt.Printf("[error] ---  %v", err)
+			logger.Errorf("---  %v", err)
 			os.Exit(1)
 		}
 	},

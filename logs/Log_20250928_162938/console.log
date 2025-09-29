@@ -1,0 +1,9 @@
+[2025-09-28 16:29:38] [info] 这是一段输出
+[2025-09-28 16:29:38] [info] 开始启动 load 程序..., 参数为: %!(EXTRA []string=[])
+[2025-09-28 16:29:38] [info] 正在搜索 .orbit 文件...
+[2025-09-28 16:29:38] [info] 发现 .orbit 文件: F:\_Default\GoLang\Proj\Orbit\backup.orbit
+[2025-09-28 16:29:38] [info] .orbit 文件已成功解压到: F:/_Default/GoLang/Proj/backup_orbit_test
+[2025-09-28 16:29:38] [info] 配置文件目录: F:\_Default\GoLang\Proj\backup_orbit_test\configs
+[2025-09-28 16:29:38] [info] config: %!(EXTRA *cmd.Config=&{F:\_Default\GoLang\Proj\backup_orbit_test\configs F:/_Default/GoLang/Proj/backup_orbit_test})
+[2025-09-28 16:29:38] [info] 配置加载完成
+[2025-09-28 16:29:38] [info] load 程序执行完毕.

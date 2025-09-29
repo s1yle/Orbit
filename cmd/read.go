@@ -3,7 +3,6 @@ package cmd
 import (
 	"archive/zip"
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -14,58 +13,58 @@ import (
 func readManifest(file *zip.File) error {
 	rc, err := file.Open()
 	if err != nil {
-		return fmt.Errorf("无法打开 manifest.json: %v", err)
+		return err
 	}
 	defer rc.Close()
 
 	// 解析 JSON 内容
 	content, err := io.ReadAll(rc)
 	if err != nil {
-		return fmt.Errorf("无法读取 manifest.json 内容: %v", err)
+		return err
 	}
 
 	var manifest Manifest
 	err = json.Unmarshal(content, &manifest)
 	if err != nil {
-		return fmt.Errorf("无法解析 manifest.json 内容: %v", err)
+		return err
 	}
 
-	fmt.Printf("Manifest 内容: \n")
-	fmt.Printf("  保存的时间: %s\n", manifest.Timestamp)
-	fmt.Printf("  系统:        %s\n", manifest.OS)
-	fmt.Printf("  架构:      %s\n", manifest.Arch)
-	fmt.Printf("  主机名:  %s\n", manifest.Hostname)
-	fmt.Printf("  用户名:  %s\n", manifest.Username)
+	logger.Infof("Manifest 内容:  ")
+	logger.Infof("  保存的时间: %s ", manifest.Timestamp)
+	logger.Infof("  系统:        %s ", manifest.OS)
+	logger.Infof("  架构:      %s ", manifest.Arch)
+	logger.Infof("  主机名:  %s ", manifest.Hostname)
+	logger.Infof("  用户名:  %s ", manifest.Username)
 
 	return nil
 }
 
 func readFromOrbitFile(filePath string) error {
-	fmt.Printf("正在读取 .orbit 文件: %s\n", filePath)
+	logger.Infof("正在读取 .orbit 文件: %s ", filePath)
 
 	// 获取文件信息
 	fileInfo, err := os.Stat(filePath)
 	if err != nil {
-		fmt.Printf("错误: 无法获取文件信息: %v\n", err)
+		logger.Infof("错误: 无法获取文件信息: %v ", err)
 		return err
 	}
 
 	// 显示文件基本信息
-	fmt.Printf("文件大小: %d 字节 (%.2f KB)\n", fileInfo.Size(), float64(fileInfo.Size())/1024)
-	fmt.Printf("修改时间: %s\n", fileInfo.ModTime().Format("2006-01-02 15:04:05"))
-	fmt.Println("----------------------------------------")
+	logger.Infof("文件大小: %d 字节 (%.2f KB) ", fileInfo.Size(), float64(fileInfo.Size())/1024)
+	logger.Infof("修改时间: %s ", fileInfo.ModTime().Format("2006-01-02 15:04:05"))
+	logger.Infof("----------------------------------------")
 
 	// 打开zip文件
 	r, err := zip.OpenReader(filePath)
 	if err != nil {
-		fmt.Printf("错误: 无法打开 .orbit 文件: %v\n", err)
+		logger.Infof("错误: 无法打开 .orbit 文件: %v ", err)
 		return err
 	}
 	defer r.Close()
 
 	// 显示zip文件基本信息
-	fmt.Printf("包含文件数量: %d\n", len(r.File))
-	fmt.Println("----------------------------------------")
+	logger.Infof("包含文件数量: %d ", len(r.File))
+	logger.Infof("----------------------------------------")
 
 	// 遍历所有文件并显示信息
 	totalSize := int64(0)
@@ -73,16 +72,16 @@ func readFromOrbitFile(filePath string) error {
 	hasSoftwareList := false
 	configCount := 0
 
-	fmt.Println("文件列表:")
+	logger.Infof("文件列表:")
 	for _, file := range r.File {
-		// fmt.Printf("  %d. %s", i+1, file.Name)
+		// logger.Infof("  %d. %s", i+1, file.Name)
 
 		if file.FileInfo().IsDir() {
-			// fmt.Printf(" (目录)")
+			// logger.Infof(" (目录)")
 		} else {
 			fileSize := int64(file.UncompressedSize64)
 			totalSize += fileSize
-			// fmt.Printf(" (%d 字节)", fileSize)
+			// logger.Infof(" (%d 字节)", fileSize)
 		}
 		// fmt.Println()
 
@@ -96,28 +95,28 @@ func readFromOrbitFile(filePath string) error {
 		}
 	}
 
-	fmt.Println("----------------------------------------")
-	fmt.Printf("总未压缩大小: %d 字节 (%.2f KB)\n", totalSize, float64(totalSize)/1024)
-	fmt.Printf("包含 manifest.json: %v\n", hasManifest)
-	fmt.Printf("包含 software-list.json: %v\n", hasSoftwareList)
-	fmt.Printf("配置文件数量: %d\n", configCount)
+	logger.Infof("----------------------------------------")
+	logger.Infof("总未压缩大小: %d 字节 (%.2f KB)", totalSize, float64(totalSize)/1024)
+	logger.Infof("包含 manifest.json: %v", hasManifest)
+	logger.Infof("包含 software-list.json: %v", hasSoftwareList)
+	logger.Infof("配置文件数量: %d", configCount)
 
 	// 如果存在manifest.json，读取并显示其内容
 	if hasManifest {
-		fmt.Println("----------------------------------------")
+		logger.Infof("----------------------------------------")
 
 		for _, file := range r.File {
 			if file.Name == "manifest.json" {
 				rc, err := file.Open()
 				if err != nil {
-					fmt.Printf("  错误: 无法读取 manifest.json: %v\n", err)
+					logger.Errorf("  错误: 无法读取 manifest.json: %v ", err)
 					break
 				}
 				defer rc.Close()
 
 				// content, err := io.ReadAll(rc)
 				// if err != nil {
-				// 	fmt.Printf("  错误: 无法读取 manifest.json 内容: %v\n", err)
+				// 	logger.Infof("  错误: 无法读取 manifest.json 内容: %v ", err)
 				// 	break
 				// }
 
@@ -137,19 +136,20 @@ var readOrbitFile = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		// 参数检查
 		if len(args) < 1 {
-			fmt.Println("Please provide the .orbit file name.")
+			logger.Errorf("Please provide the .orbit file name.")
 			return
 		}
 
 		orbitFile := args[0]
 
-		fmt.Printf("Reading .orbit file: %s\n", orbitFile)
+		logger.Infof("Reading .orbit file: %s ", orbitFile)
 		err := readFromOrbitFile(orbitFile)
 		if err != nil {
-			fmt.Errorf("failed to read .orbit file: %v", err)
+			logger.Errorf("failed to read .orbit file: %v", err)
+			return
 		}
 
-		fmt.Println("Read operation completed.")
+		logger.Infof("Read operation completed.")
 	},
 }
 

@@ -1,12 +1,14 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
+
+var logger *logrus.Logger
 
 // VSCode的配置目录
 var CodeConfigDir string = filepath.Join(os.Getenv("APPDATA"), "Code")
@@ -35,10 +37,12 @@ and installed software lists across different systems.`,
 	},
 }
 
-func Execute() {
+func Execute(log *logrus.Logger) {
+	logger = log
 
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
+
+		logger.Info(err)
 		os.Exit(1)
 	}
 }
