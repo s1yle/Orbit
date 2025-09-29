@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"archive/zip"
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -17,6 +19,10 @@ type DirName struct {
 	Path string
 	Type string
 }
+
+var (
+	publicKeyPath string
+)
 
 func saveVscode(tempDir string) error {
 	logger.Infof("正在保存Vscode配置文件...")
@@ -126,25 +132,16 @@ func convertMeniToJson() ([]byte, error) {
 	return jsonData, nil
 }
 
-// @param tempDir C:\Users\mmili\AppData\Local\Temp\test_orbit-backup
-func createOrbitZip(tempDir string) error {
-
-	backupFile, err := os.Create("backup.orbit")
-	if err != nil {
-		return err
-	}
-	defer backupFile.Close()
-
-	zipWriter := zip.NewWriter(backupFile)
-	defer zipWriter.Close()
+// createOrbitZipInMemory creates the orbit zip file in memory and returns the bytes
+func createOrbitZipInMemory(tempDir string) ([]byte, error) {
+	var buffer bytes.Buffer
+	zipWriter := zip.NewWriter(&buffer)
 
 	logger.Info("---  正在将文件写入 orbit包")
-	err = filepath.Walk(tempDir, func(path string, info fs.FileInfo, err error) error {
+	err := filepath.Walk(tempDir, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-
-		// fmt.Println(path)
 
 		relpath, err := filepath.Rel(tempDir, path)
 
@@ -158,25 +155,10 @@ func createOrbitZip(tempDir string) error {
 
 		// 如果是目录，创建目录条目并返回
 		if info.IsDir() {
-			// fmt.Println(relpath)
-			// 为目录创建条目（以斜杠结尾）
 			_, err := zipWriter.Create(relpath + "/")
 			if err != nil {
 				return err
 			}
-
-			// dirname := info.Name()
-
-			// switch dirname {
-			// case "globalStorage":
-			// 	logger.Infof("正在保存 -> 扩展的全局配置数据(%v)", dirname)
-			// case "History":
-			// 	logger.Infof("正在保存 -> 文件编辑历史(%v)", dirname)
-			// case "snippets":
-			// 	logger.Infof("正在保存 -> 用户自定义代码片段(%v)", dirname)
-			// case "workspaceStorage":
-			// 	logger.Infof("正在保存 -> 工作区特定配置(%v)", dirname)
-			// }
 			return nil
 		}
 
@@ -196,11 +178,18 @@ func createOrbitZip(tempDir string) error {
 		return err
 	})
 
-	return err
+	if err != nil {
+		return nil, err
+	}
+
+	if err := zipWriter.Close(); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
 }
 
 func createBackup() error {
-
 	// @param tempDir C:\Users\mmili\AppData\Local\Temp\test_orbit-backup
 	tempDir, err := os.MkdirTemp("", "test_orbit-backup")
 	logger.Infof("成功创建临时目录：%v", tempDir)
@@ -225,13 +214,43 @@ func createBackup() error {
 	}
 	logger.Info("创建manifest.json文件")
 
-	//压缩成.orbit格式
-	err = createOrbitZip(tempDir)
+	// Create zip in memory
+	zipData, err := createOrbitZipInMemory(tempDir)
 	if err != nil {
 		return err
 	}
 
-	return err
+	// Handle encryption if public key is provided
+	if publicKeyPath != "" {
+		logger.Infof("使用公钥加密备份文件: %s", publicKeyPath)
+
+		// Load public key
+		publicKey, err := LoadPublicKey(publicKeyPath)
+		if err != nil {
+			return fmt.Errorf("加载公钥失败: %v", err)
+		}
+
+		// Encrypt the backup data
+		encryptedSymmetricKey, encryptedData, err := EncryptBackup(zipData, publicKey)
+		if err != nil {
+			return fmt.Errorf("加密备份失败: %v", err)
+		}
+
+		// Create encrypted orbit file
+		if err := CreateEncryptedOrbitFile(encryptedSymmetricKey, encryptedData); err != nil {
+			return fmt.Errorf("创建加密orbit文件失败: %v", err)
+		}
+
+		logger.Info("备份已成功加密并保存为 backup.orbit")
+	} else {
+		// Save unencrypted backup
+		if err := os.WriteFile("backup.orbit", zipData, 0644); err != nil {
+			return err
+		}
+		logger.Info("备份已成功保存为 backup.orbit")
+	}
+
+	return nil
 }
 
 var save = &cobra.Command{
@@ -240,7 +259,9 @@ var save = &cobra.Command{
 	Long: `Create a compressed backup file (.orbit) containing:
 	- manifest.json with timestamp and system information
 	- software-list.json with installed software
-	- configs/ folder with configuration files`,
+	- configs/ folder with configuration files
+
+Encryption is supported using a user-defined public key.`,
 	Args: cobra.MaximumNArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := createBackup(); err != nil {
@@ -251,5 +272,6 @@ var save = &cobra.Command{
 }
 
 func init() {
+	save.Flags().StringVarP(&publicKeyPath, "public-key", "k", "", "Path to public key file for encryption (PEM format)")
 	rootCmd.AddCommand(save)
 }
