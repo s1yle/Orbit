@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"archive/zip"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -72,6 +74,7 @@ func extractFile(zipFile *zip.File, targetPath string) error {
 
 // extractOrbitFile 解压.orbit压缩文件
 func extractOrbitFile(orbitFilePath, targetPath string) error {
+	logger.Infoln(targetPath)
 	// 打开zip文件
 	reader, err := zip.OpenReader(orbitFilePath)
 	if err != nil {
@@ -102,11 +105,10 @@ func extractOrbitFile(orbitFilePath, targetPath string) error {
 
 // readConfigFile 读取配置文件
 func readConfigFile(configPath string) (*Config, error) {
-	configDir := filepath.Join(configPath, "configs")
 
 	// 检查configs目录是否存在
-	if _, err := os.Stat(configDir); os.IsNotExist(err) {
-		logger.Errorf("configs目录不存在: %s", configDir)
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		logger.Errorf("configs目录不存在: %s", configPath)
 		return nil, err
 	}
 
@@ -114,11 +116,11 @@ func readConfigFile(configPath string) (*Config, error) {
 	// 例如读取JSON、YAML等格式的配置文件
 
 	config := &Config{
-		BackupConfigPath: configDir,
+		BackupConfigPath: configPath,
 		TargetPath:       configPath,
 	}
 
-	logger.Infof("配置文件目录: %s", configDir)
+	logger.Infof("配置文件目录: %s", configPath)
 
 	// 可以添加更多配置读取逻辑
 	// 例如：读取具体的配置文件内容
@@ -126,8 +128,107 @@ func readConfigFile(configPath string) (*Config, error) {
 	return config, nil
 }
 
+type ConfigDirType struct {
+	Name         string
+	Path         string
+	OriginalPath string
+}
+
+func readStruct(targetZipFile string, targetDirName string) (*ConfigDirType, error) {
+	if targetDirName == "" {
+		return nil, fmt.Errorf("targetDirName 不能为空")
+	}
+
+	logger.Infof("func<readStruct> -> 正在读取结构信息(%v)...", targetDirName)
+	logger.Infoln("func<readStruct> -> 目标文件: ", targetZipFile)
+
+	// 打开zip文件
+	r, err := zip.OpenReader(targetZipFile)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+
+	var configDir ConfigDirType
+	for _, f := range r.File {
+		// logger.Infof("func<readStruct> 发现文件: %s", f.Name)
+		if strings.HasPrefix(f.Name, targetDirName) || f.Name == targetDirName || filepath.Base(f.Name) == targetDirName {
+
+			logger.Infof("func<readStruct> 找到目标目录: %s", f.Name)
+			logger.Infof("文件信息: %+v", f.FileInfo())
+
+			// 找到目标目录，读取信息
+			configDir.Name = filepath.Base(targetDirName)
+			configDir.Path = f.Name
+			switch filepath.Base(f.Name) {
+			case "APPDATA":
+				configDir.OriginalPath = CodeConfigDir
+			default:
+				configDir.OriginalPath = "Unknown"
+			}
+
+			return &configDir, err
+		}
+	}
+
+	return &configDir, err
+}
+
+func extractSpecificDir(zipFile, targetDirInZip, destDir string) error {
+	// 打开ZIP文件
+	r, err := zip.OpenReader(zipFile)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	// 遍历ZIP中的文件/目录
+	for _, f := range r.File {
+		// 检查文件路径是否位于目标目录内
+		if strings.HasPrefix(f.Name, targetDirInZip) || f.Name == targetDirInZip {
+			// 构建目标路径
+			fpath := filepath.Join(destDir, strings.TrimPrefix(f.Name, targetDirInZip))
+			// logger.Info("正在解压: ", fpath)
+
+			// 如果是目录，则创建目录
+			if f.FileInfo().IsDir() {
+				if err := os.MkdirAll(fpath, f.Mode()); err != nil {
+					return err
+				}
+				continue
+			}
+
+			// 确保文件所在目录存在
+			if err := os.MkdirAll(filepath.Dir(fpath), 0755); err != nil {
+				return err
+			}
+
+			// 创建目标文件
+			outFile, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+			if err != nil {
+				return err
+			}
+			defer outFile.Close()
+
+			// 打开ZIP中的源文件
+			rc, err := f.Open()
+			if err != nil {
+				return err
+			}
+			defer rc.Close()
+
+			// 复制文件内容
+			_, err = io.Copy(outFile, rc)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func loadFunc() error {
-	targetExtractPath := "F:/_Default/GoLang/Proj/backup_orbit_test"
+	targetExtractPath := "./bacup_orbit/extractPath"
 
 	logger.Infof("正在搜索 .orbit 文件...")
 
@@ -137,15 +238,31 @@ func loadFunc() error {
 		logger.Errorf("查找.orbit文件失败: %v", err)
 		return err
 	}
-
 	logger.Infof("发现 .orbit 文件: %s", orbitFilePath)
 
-	// 解压.orbit文件
-	if err := extractOrbitFile(orbitFilePath, targetExtractPath); err != nil {
-		logger.Errorf("解压.orbit文件失败: %v", err)
+	// 读取结构信息
+	cdt, err := readStruct(orbitFilePath, "APPDATA")
+	if err != nil {
+		logger.Errorf("读取结构信息失败: %v", err)
 		return err
 	}
 
+	// 处理不同的配置目录
+	switch cdt.Name {
+	case "APPDATA":
+		// 处理 APPDATA 目录
+		logger.Infof("配置目录 %s 对应系统目录: %s", cdt.Name, cdt.OriginalPath)
+
+	default:
+		logger.Infof("未知配置目录: %s", cdt.Name)
+	}
+
+	// 解压.orbit文件
+	targetExtractPath = cdt.OriginalPath
+	if err := extractSpecificDir(orbitFilePath, filepath.Join(cdt.Path), targetExtractPath); err != nil {
+		logger.Errorf("解压.orbit文件失败: %v", err)
+		return err
+	}
 	logger.Infof(".orbit 文件已成功解压到: %s", targetExtractPath)
 
 	// 读取配置文件
