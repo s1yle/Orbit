@@ -13,16 +13,24 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type DirName struct {
+	Path string
+	Type string
+}
+
 func saveVscode(tempDir string) error {
 	logger.Infof("正在保存Vscode配置文件...")
+	logger.Infof("CodeConfigDir: %v", CodeConfigDir)
 
 	configs_base := filepath.Join(tempDir, "configs")
 	configs_base_vscode_base := filepath.Join(tempDir, "configs", "vscode_config_dir")
 	configs_base_vscode_base_APPDATA := filepath.Join(tempDir, "configs", "vscode_config_dir", "APPDATA")
+	configs_base_vscode_base_USER := filepath.Join(tempDir, "configs", "vscode_config_dir", "USER")
 
 	UsersFile := filepath.Join(CodeConfigDir, "User")
 	WorkspacesFile := filepath.Join(CodeConfigDir, "Workspaces")
-	dirs := []string{UsersFile, WorkspacesFile}
+	ConfigsInUser := filepath.Join(CodeUserDir)
+	dirs := []DirName{DirName{UsersFile, "APPDATA"}, DirName{WorkspacesFile, "APPDATA"}, DirName{ConfigsInUser, "USER"}}
 	// fmt.Println("dirs: ", dirs)
 	err := os.MkdirAll(filepath.Join(configs_base), 0644)
 	if err != nil {
@@ -34,22 +42,35 @@ func saveVscode(tempDir string) error {
 	}
 
 	for _, dir := range dirs {
-		workingDir := filepath.Base(dir)
-		err = os.MkdirAll(filepath.Join(configs_base_vscode_base_APPDATA, workingDir), 0644)
+		var workingDir string
+		switch dir.Type {
+		case "APPDATA":
+			workingDir := filepath.Base(dir.Path)
+			logger.Infof("正在保存 -> %v (%v)", workingDir, dir.Type)
+			err = os.MkdirAll(filepath.Join(configs_base_vscode_base_APPDATA, workingDir), 0644)
+		case "USER":
+			workingDir := filepath.Base(dir.Path)
+			err = os.MkdirAll(filepath.Join(configs_base_vscode_base_USER, workingDir), 0644)
+		}
+
 		if err != nil {
 			return err
 		}
 
-		filepath.Walk(dir, func(path string, info fs.FileInfo, err error) error {
+		filepath.Walk(dir.Path, func(path string, info fs.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
 			// fmt.Printf("[info] --- 当前目录: %v \n", filepath.Base(dir))
-			relPath, err := filepath.Rel(dir, path) // 获取相对路径
+			relPath, err := filepath.Rel(dir.Path, path) // 获取相对路径
+			// logger.Infof("dir.Path: %v", dir.Path)       //path: C:\Users\mmili985\AppData\Roaming\Code\User\globalStorage\state.vscdb
+			// logger.Infof("relPath: %v", relPath)         //relPath: extensions\vscodeshift.mui-snippets-1.0.1\package.json
 			if err != nil {
 				return err
 			}
-			dstPath := filepath.Join(filepath.Join(configs_base_vscode_base_APPDATA, workingDir), relPath) // 目标路径
+			dstPath := filepath.Join(filepath.Join(configs_base_vscode_base, dir.Type, workingDir), filepath.Base(dir.Path), relPath) // 目标路径
+			// logger.Infof("dstPath: %v", dstPath)
+			//C:\Users\mmili985\AppData\Local\Temp\test_orbit-backup3878169596\configs\vscode_config_dir\USER\extensions\heisthepirate.mui-snippets-updated-1.0.0\node_modules\atob
 
 			if info.IsDir() {
 				err = os.MkdirAll(dstPath, os.ModePerm) // 创建目录
@@ -144,18 +165,18 @@ func createOrbitZip(tempDir string) error {
 				return err
 			}
 
-			dirname := info.Name()
+			// dirname := info.Name()
 
-			switch dirname {
-			case "globalStorage":
-				logger.Infof("正在保存 -> 扩展的全局配置数据(%v)", dirname)
-			case "History":
-				logger.Infof("正在保存 -> 文件编辑历史(%v)", dirname)
-			case "snippets":
-				logger.Infof("正在保存 -> 用户自定义代码片段(%v)", dirname)
-			case "workspaceStorage":
-				logger.Infof("正在保存 -> 工作区特定配置(%v)", dirname)
-			}
+			// switch dirname {
+			// case "globalStorage":
+			// 	logger.Infof("正在保存 -> 扩展的全局配置数据(%v)", dirname)
+			// case "History":
+			// 	logger.Infof("正在保存 -> 文件编辑历史(%v)", dirname)
+			// case "snippets":
+			// 	logger.Infof("正在保存 -> 用户自定义代码片段(%v)", dirname)
+			// case "workspaceStorage":
+			// 	logger.Infof("正在保存 -> 工作区特定配置(%v)", dirname)
+			// }
 			return nil
 		}
 

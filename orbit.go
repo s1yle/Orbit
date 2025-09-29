@@ -30,7 +30,6 @@ func (m *MyFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 }
 
 func main() {
-
 	log = logrus.New()
 
 	log.SetFormatter(&MyFormatter{})

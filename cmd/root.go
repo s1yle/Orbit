@@ -10,8 +10,11 @@ import (
 
 var logger *logrus.Logger
 
-// VSCode的配置目录
-var CodeConfigDir string = filepath.Join(os.Getenv("APPDATA"), "Code")
+// VSCode在 APPDATA 中的配置目录
+var CodeConfigDir string = filepath.Join(os.Getenv("APPDATA"), "Code") //C:\Users\mmili985\AppData\Roaming\Code
+
+// VSCode在 User 中的目录
+var CodeUserDir string = filepath.Join(os.Getenv("USERPROFILE"), ".vscode") //C:\Users\mmili985\.vscode
 
 // 当前目录的绝对路径
 var CurrentDir, _ = filepath.Abs(".")
