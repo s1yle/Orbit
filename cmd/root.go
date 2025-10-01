@@ -27,6 +27,12 @@ type Manifest struct {
 	Username  string `json:"username"`
 }
 
+type ConfigDirType struct {
+	Name         string
+	Path         string
+	OriginalPath string
+}
+
 var rootCmd = &cobra.Command{
 	Use:   "orbit",
 	Short: "Orbit is a backup and restore tool for software configurations",

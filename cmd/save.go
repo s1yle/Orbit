@@ -15,18 +15,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type DirName struct {
-	Path string
-	Type string
-}
-
 var (
 	publicKeyPath string
 )
 
 func saveVscode(tempDir string) error {
 	logger.Infof("正在保存Vscode配置文件...")
-	logger.Infof("CodeConfigDir: %v", CodeConfigDir)
 
 	configs_base := filepath.Join(tempDir, "configs")
 	configs_base_vscode_base := filepath.Join(tempDir, "configs", "vscode_config_dir")
@@ -36,8 +30,10 @@ func saveVscode(tempDir string) error {
 	UsersFile := filepath.Join(CodeConfigDir, "User")
 	WorkspacesFile := filepath.Join(CodeConfigDir, "Workspaces")
 	ConfigsInUser := filepath.Join(CodeUserDir)
-	dirs := []DirName{DirName{UsersFile, "APPDATA"}, DirName{WorkspacesFile, "APPDATA"}, DirName{ConfigsInUser, "USER"}}
-	// fmt.Println("dirs: ", dirs)
+	dirs := []ConfigDirType{ConfigDirType{"APPDATA", UsersFile, CodeConfigDir},
+		ConfigDirType{"APPDATA", WorkspacesFile, CodeConfigDir},
+		ConfigDirType{"USER", ConfigsInUser, CodeUserDir}}
+
 	err := os.MkdirAll(filepath.Join(configs_base), 0644)
 	if err != nil {
 		return err
@@ -48,15 +44,31 @@ func saveVscode(tempDir string) error {
 	}
 
 	for _, dir := range dirs {
-		var workingDir string
-		switch dir.Type {
+		// var workingDir string
+		var extractPath string
+		switch dir.Name {
 		case "APPDATA":
 			workingDir := filepath.Base(dir.Path)
-			logger.Infof("正在保存 -> %v (%v)", workingDir, dir.Type)
-			err = os.MkdirAll(filepath.Join(configs_base_vscode_base_APPDATA, workingDir), 0644)
+			logger.Infof("dir.Path: %s", dir.Path)
+
+			extractPath = filepath.Join(configs_base_vscode_base_APPDATA, "Code", workingDir)
+			logger.Infof("extractPath: %s", extractPath)
+
+			err = os.MkdirAll(extractPath, 0644)
+			if err != nil {
+				return err
+			}
 		case "USER":
 			workingDir := filepath.Base(dir.Path)
-			err = os.MkdirAll(filepath.Join(configs_base_vscode_base_USER, workingDir), 0644)
+			logger.Infof("dir.Path: %s", dir.Path)
+
+			extractPath = filepath.Join(configs_base_vscode_base_USER, workingDir)
+			logger.Infof("extractPath: %s", extractPath)
+
+			err = os.MkdirAll(extractPath, 0644)
+			if err != nil {
+				return err
+			}
 		}
 
 		if err != nil {
@@ -67,29 +79,25 @@ func saveVscode(tempDir string) error {
 			if err != nil {
 				return err
 			}
-			// fmt.Printf("[info] --- 当前目录: %v \n", filepath.Base(dir))
+
 			relPath, err := filepath.Rel(dir.Path, path) // 获取相对路径
-			// logger.Infof("dir.Path: %v", dir.Path)       //path: C:\Users\mmili985\AppData\Roaming\Code\User\globalStorage\state.vscdb
-			// logger.Infof("relPath: %v", relPath)         //relPath: extensions\vscodeshift.mui-snippets-1.0.1\package.json
 			if err != nil {
 				return err
 			}
-			dstPath := filepath.Join(filepath.Join(configs_base_vscode_base, dir.Type, workingDir), filepath.Base(dir.Path), relPath) // 目标路径
-			// logger.Infof("dstPath: %v", dstPath)
-			//C:\Users\mmili985\AppData\Local\Temp\test_orbit-backup3878169596\configs\vscode_config_dir\USER\extensions\heisthepirate.mui-snippets-updated-1.0.0\node_modules\atob
+
+			dstPath := filepath.Join(extractPath, relPath) // 目标路径
+			logger.Infof("正在处理文件: %s.  目录: (%s)", filepath.Base(dstPath), filepath.Dir(dstPath))
 
 			if info.IsDir() {
 				err = os.MkdirAll(dstPath, os.ModePerm) // 创建目录
 				if err != nil {
 					return err
 				}
-				// fmt.Println("dir: ", dstPath)
 			} else {
 				err = copyFile(dstPath, path) // 复制文件
 				if err != nil {
 					return err
 				}
-				// fmt.Println(path)
 			}
 			return nil
 		})
