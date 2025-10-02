@@ -19,6 +19,8 @@ var CodeUserDir string = filepath.Join(os.Getenv("USERPROFILE"), ".vscode") //C:
 // 当前目录的绝对路径
 var CurrentDir, _ = filepath.Abs(".")
 
+var EncryptedVerStr string = "ORBIT_ENCRYPTED_v0.0.2\n"
+
 type Manifest struct {
 	Timestamp string `json:"timestamp"`
 	OS        string `json:"os"`

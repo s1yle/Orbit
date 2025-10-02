@@ -11,6 +11,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	privateKeyPath string
+)
+
 type Config struct {
 	BackupConfigPath string `json:"backup_config_path"`
 	TargetPath       string `json:"target_path"`
@@ -264,6 +268,67 @@ func handleByConfigDirType(cdt *ConfigDirType, orbitFilePath string) error {
 
 }
 
+// loadDecryptedOrbitFile handles loading and decrypting an encrypted orbit file
+func loadDecryptedOrbitFile(orbitFilePath, privateKeyPath string) error {
+	logger.Infof("正在加载加密的 .orbit 文件: %s", orbitFilePath)
+
+	// Load private key
+	privateKey, err := LoadPrivateKey(privateKeyPath)
+	if err != nil {
+		return fmt.Errorf("加载私钥失败: %v", err)
+	}
+
+	// Read encrypted orbit file
+	encryptedSymmetricKey, encryptedData, err := ReadEncryptedOrbitFile(orbitFilePath)
+	if err != nil {
+		return fmt.Errorf("读取加密orbit文件失败: %v", err)
+	}
+
+	// Decrypt backup data
+	decryptedData, err := DecryptBackup(encryptedSymmetricKey, encryptedData, privateKey)
+	if err != nil {
+		return fmt.Errorf("解密备份数据失败: %v", err)
+	}
+
+	// Create temporary file for decrypted data
+	tempFile, err := os.CreateTemp("", "orbit_decrypted_*.orbit")
+	if err != nil {
+		return fmt.Errorf("创建临时文件失败: %v", err)
+	}
+	defer os.Remove(tempFile.Name())
+	defer tempFile.Close()
+
+	// Write decrypted data to temporary file
+	if _, err := tempFile.Write(decryptedData); err != nil {
+		return fmt.Errorf("写入临时文件失败: %v", err)
+	}
+
+	// Use the temporary file for loading
+	orbitFilePath = tempFile.Name()
+
+	logger.Info("备份数据解密成功")
+
+	DirPaths := []string{"APPDATA", "USER"}
+	for _, dir := range DirPaths {
+
+		// 读取结构信息
+		cdt, err := readStruct(orbitFilePath, dir)
+		if err != nil {
+			logger.Errorf("读取结构信息失败: %v", err)
+			return err
+		}
+
+		// 处理配置目录
+		if err := handleByConfigDirType(cdt, orbitFilePath); err != nil {
+			logger.Errorf("处理配置目录失败: %v", err)
+			return err
+		}
+	}
+
+	logger.Infof("配置加载完成")
+	return nil
+}
+
 func loadFunc(orbitFilePath string) error {
 	// 如果没有提供文件路径，搜索当前目录及父目录
 	if orbitFilePath == "" {
@@ -278,6 +343,24 @@ func loadFunc(orbitFilePath string) error {
 		logger.Infof("发现 .orbit 文件: %s", orbitFilePath)
 	}
 
+	// Check if file is encrypted
+	fileData, err := os.ReadFile(orbitFilePath)
+	if err != nil {
+		return fmt.Errorf("读取orbit文件失败: %v", err)
+	}
+
+	// Check if it's an encrypted file
+	isEncrypted := len(fileData) >= len(EncryptedVerStr) &&
+		string(fileData[:len(EncryptedVerStr)]) == EncryptedVerStr
+
+	if isEncrypted {
+		if privateKeyPath == "" {
+			return fmt.Errorf("检测到加密的orbit文件，但未提供私钥。请使用 --private-key 参数指定私钥文件")
+		}
+		return loadDecryptedOrbitFile(orbitFilePath, privateKeyPath)
+	}
+
+	// Original unencrypted loading logic
 	DirPaths := []string{"APPDATA", "USER"}
 	for _, dir := range DirPaths {
 
@@ -316,5 +399,6 @@ var load = &cobra.Command{
 }
 
 func init() {
+	load.Flags().StringVarP(&privateKeyPath, "private-key", "k", "", "Path to private key file for decryption (PEM format)")
 	rootCmd.AddCommand(load)
 }

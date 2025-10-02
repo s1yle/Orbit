@@ -19,6 +19,7 @@ var (
 	publicKeyPath string
 )
 
+// 保存vscode相关配置扩展文件
 func saveVscode(tempDir string) error {
 	logger.Infof("正在保存Vscode配置文件...")
 
@@ -221,6 +222,12 @@ func createBackup() error {
 		return err
 	}
 	logger.Info("创建manifest.json文件")
+
+	//保存已安装软件列表到software-list.json
+	if err := saveSoftwareList(tempDir); err != nil {
+		logger.Warnf("保存软件列表失败: %v", err)
+		// Continue with backup even if software list fails
+	}
 
 	// Create zip in memory
 	zipData, err := createOrbitZipInMemory(tempDir)

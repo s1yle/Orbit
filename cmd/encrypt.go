@@ -106,7 +106,7 @@ func CreateEncryptedOrbitFile(encryptedSymmetricKey, encryptedData []byte) error
 	defer backupFile.Close()
 
 	// Write file header to identify encrypted format
-	header := []byte("ORBIT_ENCRYPTED_v1.0\n")
+	header := []byte(EncryptedVerStr)
 	if _, err := backupFile.Write(header); err != nil {
 		return err
 	}
@@ -132,4 +132,122 @@ func CreateEncryptedOrbitFile(encryptedSymmetricKey, encryptedData []byte) error
 	}
 
 	return nil
+}
+
+// LoadPrivateKey loads an RSA private key from a PEM file
+func LoadPrivateKey(privateKeyPath string) (*rsa.PrivateKey, error) {
+	// Read the private key file
+	pemData, err := os.ReadFile(privateKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read private key file: %v", err)
+	}
+
+	// Decode PEM block
+	block, _ := pem.Decode(pemData)
+	if block == nil {
+		return nil, errors.New("failed to decode PEM block containing private key")
+	}
+
+	// Parse the private key
+	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		// Try parsing as PKCS8
+		key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse private key: %v", err)
+		}
+
+		rsaKey, ok := key.(*rsa.PrivateKey)
+		if !ok {
+			return nil, errors.New("loaded key is not an RSA private key")
+		}
+		return rsaKey, nil
+	}
+
+	return privateKey, nil
+}
+
+// DecryptBackup decrypts the backup data using private key
+func DecryptBackup(encryptedSymmetricKey, encryptedData []byte, privateKey *rsa.PrivateKey) ([]byte, error) {
+	// Decrypt the symmetric key with RSA-OAEP
+	symmetricKey, err := rsa.DecryptOAEP(
+		sha256.New(),
+		rand.Reader,
+		privateKey,
+		encryptedSymmetricKey,
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt symmetric key: %v", err)
+	}
+
+	// Decrypt the backup data with AES-GCM
+	decryptedData, err := decryptWithAES(symmetricKey, encryptedData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt data with AES: %v", err)
+	}
+
+	return decryptedData, nil
+}
+
+// decryptWithAES decrypts data using AES-GCM
+func decryptWithAES(key []byte, data []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	nonceSize := gcm.NonceSize()
+	if len(data) < nonceSize {
+		return nil, errors.New("ciphertext too short")
+	}
+
+	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return plaintext, nil
+}
+
+// ReadEncryptedOrbitFile reads and parses an encrypted .orbit file
+func ReadEncryptedOrbitFile(orbitFilePath string) ([]byte, []byte, error) {
+	fileData, err := os.ReadFile(orbitFilePath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to read orbit file: %v", err)
+	}
+
+	// Check if it's an encrypted file
+	if len(fileData) < len(EncryptedVerStr) ||
+		string(fileData[:len(EncryptedVerStr)]) != EncryptedVerStr {
+		return nil, nil, errors.New("not an encrypted orbit file")
+	}
+
+	// Skip header
+	data := fileData[len(EncryptedVerStr):]
+
+	// Read encrypted symmetric key length
+	if len(data) < 4 {
+		return nil, nil, errors.New("invalid orbit file format: missing key length")
+	}
+	keyLen := int(data[0])<<24 | int(data[1])<<16 | int(data[2])<<8 | int(data[3])
+	data = data[4:]
+
+	// Read encrypted symmetric key
+	if len(data) < keyLen {
+		return nil, nil, errors.New("invalid orbit file format: key length mismatch")
+	}
+	encryptedSymmetricKey := data[:keyLen]
+	data = data[keyLen:]
+
+	// Remaining data is the encrypted backup
+	encryptedData := data
+
+	return encryptedSymmetricKey, encryptedData, nil
 }
