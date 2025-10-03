@@ -22,10 +22,18 @@ func (m *MyFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	b := &bytes.Buffer{}
 
 	timestamp := entry.Time.Format("2006-01-02 15:04:05")
-	var newLog string
-	newLog = fmt.Sprintf("[%s] [%s] %s\n", timestamp, entry.Level, entry.Message)
+	var baseLog string
+	baseLog = fmt.Sprintf("[%s] [%s] %s", timestamp, entry.Level, entry.Message)
 
-	b.WriteString(newLog)
+	// 检查是否有"no_newline"标记字段
+	if noNewline, ok := entry.Data["no_newline"].(bool); ok && noNewline {
+		// 有标记：不添加换行
+		b.WriteString(baseLog)
+	} else {
+		// 无标记：正常添加换行
+		b.WriteString(baseLog + "\n")
+	}
+
 	return b.Bytes(), nil
 }
 

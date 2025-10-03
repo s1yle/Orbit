@@ -41,7 +41,7 @@ func TestLoadFunc(t *testing.T) {
 		Short: "Load data",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// log.Println("\n[TEST] --------- 正在测试 'orbit load' 指令")
-			return loadFunc()
+			return loadFunc("./backup.orbit")
 		},
 	}
 

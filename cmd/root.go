@@ -40,7 +40,7 @@ var rootCmd = &cobra.Command{
 	Short: "Orbit is a backup and restore tool for software configurations",
 	Long: `Orbit helps you backup and restore your software configurations
 and installed software lists across different systems.`,
-	Version: "0.0.0.1",
+	Version: "0.0.2",
 	Args:    cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		// Show help if no subcommand is provided
