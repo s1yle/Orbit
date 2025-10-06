@@ -123,16 +123,28 @@ func findHomonymKeyFile(prefix string) (*KeyPairs, bool, error) {
 	privExists := false
 
 	// 检查公钥文件
-	if _, err := os.Stat(pubPath); err == nil {
+	if pubFileInfo, err := os.Stat(pubPath); err == nil {
 		pubExists = true
+		pubPath, err = filepath.Abs(pubFileInfo.Name())
+		if err != nil {
+			return nil, false, fmt.Errorf("检查公钥文件时发生系统错误: %w", err)
+		}
 	} else if !os.IsNotExist(err) {
 		// 真正的错误（如权限问题）
 		return nil, false, fmt.Errorf("检查公钥文件时发生系统错误: %w", err)
 	}
 
 	// 检查私钥文件
-	if _, err := os.Stat(privPath); err == nil {
+	if privFileInfo, err := os.Stat(privPath); err == nil {
 		privExists = true
+		file, err := os.Open(privFileInfo.Name())
+		if err != nil {
+			return nil, false, fmt.Errorf("检查私钥文件时发生系统错误: %w", err)
+		}
+		privPath, err = filepath.Abs(file.Name())
+		if err != nil {
+			return nil, false, fmt.Errorf("检查私钥文件时发生系统错误: %w", err)
+		}
 	} else if !os.IsNotExist(err) {
 		return nil, false, fmt.Errorf("检查私钥文件时发生系统错误: %w", err)
 	}
@@ -179,8 +191,19 @@ func genKeys(prefix string, seedStr string) (*KeyPairs, error) {
 	if prefix != "" {
 		username = prefix
 	}
-	privateKeyPath := username + "_private_key.pem"
-	publicKeyPath := username + "_public_key.pem"
+	keysPath := filepath.Join(filepath.Dir(GetConfigManager().configPath), "keys")
+
+	_, err = os.Stat(keysPath)
+	if os.IsNotExist(err) {
+		// 目录不存在，创建它
+		err = os.MkdirAll(keysPath, 0755)
+		if err != nil {
+			return nil, fmt.Errorf("创建密钥目录失败: %w", err)
+		}
+	}
+
+	privKeyPrefix := filepath.Join(keysPath, username+"_private_key.pem")
+	pubKeyPrefix := filepath.Join(keysPath, username+"_public_key.pem")
 
 	// 3. 生成私钥
 	var privateKey *rsa.PrivateKey
@@ -205,24 +228,24 @@ func genKeys(prefix string, seedStr string) (*KeyPairs, error) {
 	}
 
 	// 4. 保存私钥
-	if err := savePrivateKey(privateKey, privateKeyPath); err != nil {
+	if err := savePrivateKey(privateKey, privKeyPrefix); err != nil {
 		return nil, fmt.Errorf("保存私钥失败: %w", err)
 	}
 
 	// 5. 保存公钥
-	if err := savePublicKey(&privateKey.PublicKey, publicKeyPath); err != nil {
+	if err := savePublicKey(&privateKey.PublicKey, pubKeyPrefix); err != nil {
 		return nil, fmt.Errorf("保存公钥失败: %w", err)
 	}
 
 	// 6. 返回结果
 	keyPairs = &KeyPairs{
-		PrivateKeyPath: privateKeyPath,
-		PublicKeyPath:  publicKeyPath,
+		PrivateKeyPath: privKeyPrefix,
+		PublicKeyPath:  pubKeyPrefix,
 	}
 
 	logger.Infof("密钥对生成成功:")
-	logger.Infof("  - 私钥: %s", privateKeyPath)
-	logger.Infof("  - 公钥: %s", publicKeyPath)
+	logger.Infof("  - 私钥: %s", privKeyPrefix)
+	logger.Infof("  - 公钥: %s", pubKeyPrefix)
 	logger.Warnf("⚠️ 安全提醒: 请务必备份并安全保存您的私钥文件！")
 	logger.Warnf("⚠️ 私钥是您解密数据的唯一凭证，一旦丢失将无法恢复加密数据！")
 	logger.Warnf("⚠️ 建议将私钥文件保存在安全的离线存储设备中，并牢记其存放位置。")
@@ -232,6 +255,7 @@ func genKeys(prefix string, seedStr string) (*KeyPairs, error) {
 
 // savePrivateKey 保存私钥到 PEM 文件
 func savePrivateKey(privateKey *rsa.PrivateKey, filename string) error {
+	logger.Infof("保存私钥到: %s", filename)
 	file, err := os.Create(filename)
 	if err != nil {
 		return fmt.Errorf("创建私钥文件失败: %w", err)
@@ -280,6 +304,22 @@ var generateKeysCmd = &cobra.Command{
 		logger.Warnf("⚠️ Security Reminder: Please backup and securely save your private key file!")
 		logger.Warnf("⚠️ The private key is your only credential for decrypting data - if lost, encrypted data cannot be recovered!")
 		logger.Warnf("⚠️ Recommended to store the private key file on secure offline storage and remember its location.")
+
+		// 自动更新配置文件中的加密设置
+		configManager := GetConfigManager()
+		if configManager != nil && configManager.IsConfigLoaded() {
+			err := configManager.UpdateConfig(func(config *UserConfig) {
+				config.Encryption.Enabled = true
+				config.Encryption.PublicKeyPath = keyPairs.PublicKeyPath
+				config.Encryption.PrivateKeyPath = keyPairs.PrivateKeyPath
+				config.Encryption.DefaultAlgorithm = "RSA-2048"
+			})
+			if err != nil {
+				logger.Warnf("更新加密配置失败: %v", err)
+			} else {
+				logger.Info("加密配置已自动更新")
+			}
+		}
 	},
 }
 

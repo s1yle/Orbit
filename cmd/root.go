@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 
@@ -56,6 +57,45 @@ type ConfigDirType struct {
 	OriginalPath string
 }
 
+// VScode 配置类
+type VSCodeConfig struct {
+	ConfigDirs         []ConfigDirType `json:"config_dirs"`
+	ExcludedExtensions []string        `json:"excluded_extensions"`
+	BackupSetting      bool            `json:"backup_setting"`
+}
+
+// software 配置类
+type SoftwareConfig struct {
+	ExcludedPatterns []string `json:"excluded_patterns"`
+	IncludeStoreApps bool     `json:"include_store_apps"`
+	AutoUpdateList   bool     `json:"auto_update_list"`
+}
+
+// 加密配置类
+type EncryptionConfig struct {
+	Enabled          bool   `json:"enabled"`
+	PublicKeyPath    string `json:"public_key_path"`
+	PrivateKeyPath   string `json:"private_key_path"`
+	DefaultAlgorithm string `json:"default_algorithm"`
+}
+
+// 系统信息类
+type SystemConfig struct {
+	LastBackupTime    string `json:"last_backup_time"`
+	BackupCount       int    `json:"backup_count"`
+	LastRestoreTime   string `json:"last_restore_time,omitempty"`
+	RestoreCount      int    `json:"restore_count,omitempty"`
+	DefaultBackupPath string `json:"default_backup_path"`
+}
+
+type UserConfig struct {
+	System     SystemConfig     `json:"system"`
+	VSCode     VSCodeConfig     `json:"vscode"`
+	Software   SoftwareConfig   `json:"software"`
+	Encryption EncryptionConfig `json:"encryption"`
+	LastUpdate string           `json:"last_update"`
+}
+
 var rootCmd = &cobra.Command{
 	Use:   "orbit",
 	Short: "Orbit is a backup and restore tool for software configurations",
@@ -69,8 +109,29 @@ and installed software lists across different systems.`,
 	},
 }
 
+func writeJsonToFile(filePath string, data interface{}) error {
+	file, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(data)
+}
+
+func initOrbit_user() {
+	// 使用新的配置管理器初始化配置
+	if err := InitGlobalConfigManager(); err != nil {
+		logger.Errorf("初始化配置管理器失败: %v", err)
+	}
+}
+
 func Execute(log *logrus.Logger) {
 	logger = log
+
+	initOrbit_user()
 
 	if err := rootCmd.Execute(); err != nil {
 

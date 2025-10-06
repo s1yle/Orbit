@@ -108,7 +108,7 @@ func saveVscode(tempDir string) error {
 }
 
 // 获取系统信息到manifest 中并转换为 byte array
-func convertMeniToJson() ([]byte, error) {
+func convertManifestToJson() ([]byte, error) {
 	var jsonData []byte // 获取系统信息
 
 	hostname, err := os.Hostname()
@@ -210,7 +210,7 @@ func createBackup() error {
 	}
 
 	//获取系统信息写入进manifest.json
-	jsonData, err := convertMeniToJson()
+	jsonData, err := convertManifestToJson()
 	if err != nil {
 		return err
 	}
@@ -232,12 +232,27 @@ func createBackup() error {
 		return err
 	}
 
-	// Handle encryption if public key is provided
-	if publicKeyPath != "" {
-		logger.Infof("使用公钥加密备份文件: %s", publicKeyPath)
+	// 使用配置管理器获取加密配置
+	configManager := GetConfigManager()
+	var useEncryption bool
+	var encryptionPublicKeyPath string
+
+	if configManager != nil && configManager.IsConfigLoaded() {
+		encryptionConfig := configManager.GetEncryptionConfig()
+		useEncryption = encryptionConfig.Enabled
+		encryptionPublicKeyPath = encryptionConfig.PublicKeyPath
+	} else {
+		// 回退到原来的逻辑
+		useEncryption = publicKeyPath != ""
+		encryptionPublicKeyPath = publicKeyPath
+	}
+
+	// Handle encryption if enabled
+	if useEncryption && encryptionPublicKeyPath != "" {
+		logger.Infof("使用公钥加密备份文件: %s", encryptionPublicKeyPath)
 
 		// Load public key
-		publicKey, err := LoadPublicKey(publicKeyPath)
+		publicKey, err := LoadPublicKey(encryptionPublicKeyPath)
 		if err != nil {
 			return fmt.Errorf("加载公钥失败: %v", err)
 		}
@@ -260,6 +275,17 @@ func createBackup() error {
 			return err
 		}
 		logger.Info("备份已成功保存为 backup.orbit")
+	}
+
+	// 更新系统配置中的备份计数
+	if configManager != nil && configManager.IsConfigLoaded() {
+		err := configManager.UpdateSystemConfig(func(systemConfig *SystemConfig) {
+			systemConfig.BackupCount++
+			systemConfig.LastBackupTime = time.Now().Format("2006-01-02 15:04:05")
+		})
+		if err != nil {
+			logger.Warnf("更新系统配置失败: %v", err)
+		}
 	}
 
 	return nil
