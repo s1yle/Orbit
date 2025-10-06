@@ -95,17 +95,17 @@ func findFileByPath(path string) (*os.File, error) {
 	return srcFile, err
 }
 
-func getWinUserName() (string, error) {
+func getWinUserName() string {
 
 	user, err := user.Current()
 	if err != nil {
-		return "unknown", err
+		return "unknown"
 	}
 
-	return user.Name, nil
+	return user.Name
 }
 
-func getWinUserName2() (string, error) {
+func getWinUserName2() string {
 	var username string
 
 	_, err := os.UserHomeDir()
@@ -120,5 +120,5 @@ func getWinUserName2() (string, error) {
 		}
 	}
 
-	return username, err
+	return username
 }

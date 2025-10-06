@@ -10,6 +10,9 @@ import (
 
 var logger *logrus.Logger
 
+// 全局版本变量
+var Version string = "0.0.2.1"
+
 // VSCode在 APPDATA 中的配置目录
 var CodeConfigDir string = filepath.Join(os.Getenv("APPDATA"), "Code") //C:\Users\mmili985\AppData\Roaming\Code
 
@@ -19,7 +22,7 @@ var CodeUserDir string = filepath.Join(os.Getenv("USERPROFILE"), ".vscode") //C:
 // 当前目录的绝对路径
 var CurrentDir, _ = filepath.Abs(".")
 
-var EncryptedVerStr string = "ORBIT_ENCRYPTED_v0.0.2\n"
+var EncryptedVerStr string = "ORBIT_ENCRYPTED_v" + Version + "\n"
 
 type Manifest struct {
 	Timestamp string `json:"timestamp"`
@@ -27,6 +30,24 @@ type Manifest struct {
 	Arch      string `json:"arch"`
 	Hostname  string `json:"hostname"`
 	Username  string `json:"username"`
+}
+
+// Software represents an installed software application
+type Software struct {
+	Name        string `json:"name"`
+	Version     string `json:"version,omitempty"`
+	Publisher   string `json:"publisher,omitempty"`
+	InstallDate string `json:"installDate,omitempty"`
+	InstallPath string `json:"installPath,omitempty"`
+	Uninstall   string `json:"uninstall,omitempty"`
+	Source      string `json:"source,omitempty"`
+}
+
+// SoftwareList represents the collection of installed software
+type SoftwareList struct {
+	Timestamp  string     `json:"timestamp"`
+	TotalCount int        `json:"totalCount"`
+	Software   []Software `json:"software"`
 }
 
 type ConfigDirType struct {
@@ -40,7 +61,7 @@ var rootCmd = &cobra.Command{
 	Short: "Orbit is a backup and restore tool for software configurations",
 	Long: `Orbit helps you backup and restore your software configurations
 and installed software lists across different systems.`,
-	Version: "0.0.2",
+	Version: Version,
 	Args:    cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		// Show help if no subcommand is provided

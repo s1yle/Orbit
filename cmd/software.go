@@ -12,24 +12,6 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
-// Software represents an installed software application
-type Software struct {
-	Name        string `json:"name"`
-	Version     string `json:"version,omitempty"`
-	Publisher   string `json:"publisher,omitempty"`
-	InstallDate string `json:"installDate,omitempty"`
-	InstallPath string `json:"installPath,omitempty"`
-	Uninstall   string `json:"uninstall,omitempty"`
-	Source      string `json:"source,omitempty"`
-}
-
-// SoftwareList represents the collection of installed software
-type SoftwareList struct {
-	Timestamp  string     `json:"timestamp"`
-	TotalCount int        `json:"totalCount"`
-	Software   []Software `json:"software"`
-}
-
 // getInstalledSoftware retrieves installed software from Windows registry and WMI
 func getInstalledSoftware() ([]Software, error) {
 	var softwareList []Software

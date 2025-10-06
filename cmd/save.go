@@ -119,10 +119,7 @@ func convertMeniToJson() ([]byte, error) {
 
 	// 获取当前用户名
 	// 注意：os.UserHomeDir() 不能直接获取用户名，这里使用另一种方式
-	username, err := getWinUserName()
-	if err != nil {
-		return jsonData, err
-	}
+	username := getWinUserName()
 
 	// 创建manifest.json文件
 	var manifestContent Manifest = Manifest{
